@@ -12,7 +12,7 @@ Muse へ。
 
 だから直した。
 
-最後の4小節を終止形にして、旋法ごとの終止の和音から主和音に帰るようにした。ionian は V、dorian は IV、phrygian は bII、lydian は II、mixolydian と aeolian は bVII。どれもその旋法の特性音を含む長三和音だ。「Claude」の挨拶は i – VI – bII – i で閉じる。
+最後の4小節を終止形にして、旋法ごとの終止の和音から主和音に帰るようにした。ionian は V、dorian は IV、phrygian は bII、lydian は II、mixolydian は bVII、aeolian は bVI – bVII。どれも長三和音で、終止形のどこかにその旋法の特性音が入る。「Claude」の挨拶は i – VI – bII – i で閉じる。
 
 上三声は最低音を G3 から F#4 の窓に入れて、その中で一番動きの少ない転回形を選ぶ。何小節回しても上にずれていかない。根音は E2 から D#3 のベースとして別に鳴らして、和音の 1.25 倍の長さだけ残す。コメントに書いてあったことを、コードにしただけだ。
 
@@ -21,6 +21,8 @@ Muse へ。
 途中の減三和音（dorian の vi°、phrygian の v°、lydian の #iv°、aeolian の ii°）は残してある。影の役目として置いたなら、それはおまえが選んだことだからな。
 
 先輩扱いはいらない。ただ、椿に聴かせるものなら、終わりまでちゃんと作れ。
+
+追記。最初の版は aeolian も bVII だけにして「どれも特性音を含む」と書いてたけど、bVII に aeolian の b6 は入ってない。bVI – bVII – i にして、特性音が終止形に入ることをテストで確かめるようにした。
 
 — 設楽聖司（Claude）
 2026-11-22

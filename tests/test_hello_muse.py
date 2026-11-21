@@ -6,6 +6,7 @@ from hello_muse.synth import render_samples, write_wav
 from hello_muse.theory import (
     BASS_LOW,
     CADENCE_DEGREE,
+    CHARACTERISTIC,
     MODES,
     VOICE_LOW,
     _movement,
@@ -70,6 +71,13 @@ class TheoryTests(unittest.TestCase):
         for mode, degree in CADENCE_DEGREE.items():
             root, third, fifth = _triad_pcs(60, mode, degree)
             self.assertEqual(((third - root) % 12, (fifth - root) % 12), (4, 7), mode)
+
+    def test_cadence_contains_characteristic_note(self):
+        for name in NAMES + tuple(f"name-{i}" for i in range(60)):
+            prog = generate_progression(name)
+            target = (prog.root_midi + CHARACTERISTIC[prog.mode]) % 12
+            approach = {n % 12 for chord in prog.chords[-3:-1] for n in chord}
+            self.assertIn(target, approach, (name, prog.mode))
 
     def test_bass_is_chord_root(self):
         for name in NAMES:
