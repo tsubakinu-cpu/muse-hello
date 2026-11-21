@@ -35,17 +35,31 @@ def _tone(freq: float, t: float) -> float:
     ) / 1.47
 
 
+BASS_HOLD = 1.25  # ベースは和音の長さの 1.25 倍鳴らして、次の和音の頭まで残す
+BASS_LEVEL = 0.9
+
+
 def render_samples(progression: Progression, seconds_per_chord: float = 1.6) -> list[float]:
-    samples: list[float] = []
     frames_per_chord = int(SAMPLE_RATE * seconds_per_chord)
-    for chord in progression.chords:
+    bass_seconds = seconds_per_chord * BASS_HOLD if progression.bass else 0.0
+    bass_frames = int(SAMPLE_RATE * bass_seconds)
+    total = frames_per_chord * len(progression.chords) + max(0, bass_frames - frames_per_chord)
+    samples = [0.0] * total
+    for index, chord in enumerate(progression.chords):
+        start = index * frames_per_chord
         freqs = [midi_to_freq(n) for n in chord]
-        # 一番下の声部は少し長く残して、和音の土台にする
         for i in range(frames_per_chord):
             t = i / SAMPLE_RATE
             env = _envelope(t, seconds_per_chord)
             value = sum(_tone(f, t) for f in freqs) / len(freqs)
-            samples.append(value * env * 0.8)
+            samples[start + i] += value * env * 0.8 / (1 + BASS_LEVEL * bool(progression.bass))
+        # 一番下の声部（根音）は少し長く残して、和音の土台にする
+        if progression.bass:
+            freq = midi_to_freq(progression.bass[index])
+            for i in range(bass_frames):
+                t = i / SAMPLE_RATE
+                env = _envelope(t, bass_seconds)
+                samples[start + i] += _tone(freq, t) * env * 0.8 * BASS_LEVEL / (1 + BASS_LEVEL)
     # 全体の正規化（クリッピング防止）
     peak = max((abs(s) for s in samples), default=0.0)
     if peak > 0.98:
