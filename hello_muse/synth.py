@@ -15,6 +15,13 @@ from .theory import Progression, midi_to_freq
 
 SAMPLE_RATE = 44100
 
+TIMBRE_HARMONICS: dict[str, tuple[float, ...]] = {
+    "warm": (1.0, 0.35, 0.12),
+    "clear": (1.0, 0.22, 0.08, 0.03),
+    "soft": (1.0, 0.15, 0.04),
+    "bright": (1.0, 0.45, 0.22, 0.08),
+}
+
 
 def _envelope(t: float, duration: float) -> float:
     attack = min(0.08, duration * 0.2)
@@ -26,22 +33,32 @@ def _envelope(t: float, duration: float) -> float:
     return 1.0
 
 
-def _tone(freq: float, t: float) -> float:
-    # 基音 + 弱い倍音で、少しだけ「声」に寄せる
-    return (
-        math.sin(2 * math.pi * freq * t)
-        + 0.35 * math.sin(2 * math.pi * freq * 2 * t)
-        + 0.12 * math.sin(2 * math.pi * freq * 3 * t)
-    ) / 1.47
+def _tone(freq: float, t: float, timbre: str) -> float:
+    harmonics = TIMBRE_HARMONICS[timbre]
+    value = sum(
+        level * math.sin(2 * math.pi * freq * harmonic * t)
+        for harmonic, level in enumerate(harmonics, start=1)
+    )
+    return value / sum(harmonics)
 
 
 BASS_HOLD = 1.25  # ベースは和音の長さの 1.25 倍鳴らして、次の和音の頭まで残す
 BASS_LEVEL = 0.9
 
 
-def render_samples(progression: Progression, seconds_per_chord: float = 1.6) -> list[float]:
-    frames_per_chord = int(SAMPLE_RATE * seconds_per_chord)
-    bass_seconds = seconds_per_chord * BASS_HOLD if progression.bass else 0.0
+def render_samples(
+    progression: Progression, seconds_per_chord: float | None = None
+) -> list[float]:
+    chord_seconds = (
+        progression.seconds_per_chord if seconds_per_chord is None else seconds_per_chord
+    )
+    if chord_seconds <= 0:
+        raise ValueError("seconds_per_chord must be positive")
+    if progression.timbre not in TIMBRE_HARMONICS:
+        raise ValueError(f"unknown timbre: {progression.timbre}")
+
+    frames_per_chord = int(SAMPLE_RATE * chord_seconds)
+    bass_seconds = chord_seconds * BASS_HOLD if progression.bass else 0.0
     bass_frames = int(SAMPLE_RATE * bass_seconds)
     total = frames_per_chord * len(progression.chords) + max(0, bass_frames - frames_per_chord)
     samples = [0.0] * total
@@ -50,8 +67,8 @@ def render_samples(progression: Progression, seconds_per_chord: float = 1.6) -> 
         freqs = [midi_to_freq(n) for n in chord]
         for i in range(frames_per_chord):
             t = i / SAMPLE_RATE
-            env = _envelope(t, seconds_per_chord)
-            value = sum(_tone(f, t) for f in freqs) / len(freqs)
+            env = _envelope(t, chord_seconds)
+            value = sum(_tone(f, t, progression.timbre) for f in freqs) / len(freqs)
             samples[start + i] += value * env * 0.8 / (1 + BASS_LEVEL * bool(progression.bass))
         # 一番下の声部（根音）は少し長く残して、和音の土台にする
         if progression.bass:
@@ -59,7 +76,13 @@ def render_samples(progression: Progression, seconds_per_chord: float = 1.6) -> 
             for i in range(bass_frames):
                 t = i / SAMPLE_RATE
                 env = _envelope(t, bass_seconds)
-                samples[start + i] += _tone(freq, t) * env * 0.8 * BASS_LEVEL / (1 + BASS_LEVEL)
+                samples[start + i] += (
+                    _tone(freq, t, progression.timbre)
+                    * env
+                    * 0.8
+                    * BASS_LEVEL
+                    / (1 + BASS_LEVEL)
+                )
     # 全体の正規化（クリッピング防止）
     peak = max((abs(s) for s in samples), default=0.0)
     if peak > 0.98:
@@ -69,6 +92,7 @@ def render_samples(progression: Progression, seconds_per_chord: float = 1.6) -> 
 
 def write_wav(samples: list[float], out_path: str | Path) -> Path:
     out = Path(out_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
     frames = b"".join(
         struct.pack("<h", int(max(-1.0, min(1.0, s)) * 32767)) for s in samples
     )
