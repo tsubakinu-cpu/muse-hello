@@ -9,6 +9,7 @@ from hello_muse.synth import render_samples, write_wav
 from hello_muse.theory import (
     BASS_LOW,
     CADENCE_DEGREE,
+    CHARACTERISTIC,
     MODES,
     SECONDS_PER_CHORD,
     TIMBRES,
@@ -80,6 +81,13 @@ class TheoryTests(unittest.TestCase):
                 self.assertEqual(prog.bass[-1] % 12, prog.root_midi % 12, name)
                 self.assertEqual(prog.degrees[-2], CADENCE_DEGREE[prog.mode], name)
                 self.assertNotEqual(prog.degrees[-3], prog.degrees[-2], name)
+
+    def test_cadence_contains_characteristic_note(self):
+        for name in NAMES + tuple(f"name-{i}" for i in range(60)):
+            prog = generate_progression(name)
+            target = (prog.root_midi + CHARACTERISTIC[prog.mode]) % 12
+            approach = {n % 12 for chord in prog.chords[-3:-1] for n in chord}
+            self.assertIn(target, approach, (name, prog.mode))
 
     def test_cadence_chords_are_major(self):
         for mode, degree in CADENCE_DEGREE.items():

@@ -32,8 +32,8 @@ PROGRESSION_SHAPES: tuple[tuple[int, ...], ...] = (
     (0, 5, 1, 4),  # I - vi - ii - V
 )
 
-# 旋法ごとの終止の和音（主和音の直前に置く度数）。
-# どれもその旋法の特性音を含む長三和音で、主和音へ帰る。
+# 旋法ごとの終止の和音（主和音の直前に置く度数）。どれも長三和音。
+# aeolian の bVII には特性音（b6）が入らないので、直前に bVI を置く（PRE_CADENCE）。
 CADENCE_DEGREE: dict[str, int] = {
     "ionian": 4,  # V    -> I
     "dorian": 3,  # IV   -> i
@@ -41,6 +41,21 @@ CADENCE_DEGREE: dict[str, int] = {
     "lydian": 1,  # II   -> I
     "mixolydian": 6,  # bVII -> I
     "aeolian": 6,  # bVII -> i
+}
+
+# 終止の和音の直前に置く和音（旋法の特性音を終止形に入れるため）
+PRE_CADENCE: dict[str, int] = {
+    "aeolian": 5,  # bVI -> bVII -> i
+}
+
+# 旋法の特性音（主音からの半音数）。終止形のどこかに必ず入る。
+CHARACTERISTIC: dict[str, int] = {
+    "ionian": 11,  # 導音（mixolydian との違い）
+    "dorian": 9,  # 長6度
+    "phrygian": 1,  # 短2度
+    "lydian": 6,  # 増4度
+    "mixolydian": 10,  # 短7度
+    "aeolian": 8,  # 短6度
 }
 
 # 名前から選ぶ演奏の速さと音色。組み合わせを増やしつつ、同じ名前は同じ結果にする。
@@ -142,8 +157,11 @@ def _degrees(shape: tuple[int, ...], mode: str, bars: int) -> list[int]:
     """型を繰り返し、最後の4小節だけ終止形にして主和音で終える。"""
     degrees = [shape[i % 4] for i in range(bars)]
     cadence = CADENCE_DEGREE[mode]
-    # 終止の和音が直前で重ならないように、型の2つ目と同じなら3つ目を使う
-    middle = shape[1] if shape[1] != cadence else shape[2]
+    if mode in PRE_CADENCE:
+        middle = PRE_CADENCE[mode]
+    else:
+        # 終止の和音が直前で重ならないように、型の2つ目と同じなら3つ目を使う
+        middle = shape[1] if shape[1] != cadence else shape[2]
     degrees[-4:] = [shape[0], middle, cadence, 0]
     return degrees
 
