@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 from dataclasses import dataclass
 
 # 長音階を基準にしたモード（教会旋法）のインターバル
@@ -57,10 +58,22 @@ CHARACTERISTIC: dict[str, int] = {
     "aeolian": 8,  # 短6度
 }
 
+# 名前から選ぶ演奏の速さと音色。組み合わせを増やしつつ、同じ名前は同じ結果にする。
+SECONDS_PER_CHORD = (1.30, 1.45, 1.60, 1.75, 1.90)
+TIMBRES = ("warm", "clear", "soft", "bright")
+
 # 上三声の最低音を置く窓（G3..F#4）。繰り返しても音域がずれていかないようにする。
 VOICE_LOW = 55
 # ベース（根音）を置く窓（E2..D#3）。
 BASS_LOW = 40
+
+
+def normalize_name(name: str) -> str:
+    """見た目が同じ名前を同じ種として読めるよう、NFC正規化して前後の空白を除く。"""
+    normalized = unicodedata.normalize("NFC", name).strip()
+    if not normalized:
+        raise ValueError("name must not be empty")
+    return normalized
 
 
 def midi_to_freq(midi: float) -> float:
@@ -80,6 +93,8 @@ class Progression:
     chords: tuple[tuple[int, int, int], ...]  # 声部連結済みの三和音 (MIDI x3)
     bass: tuple[int, ...] = ()  # 各和音の根音（低音域）
     degrees: tuple[int, ...] = ()  # 各和音の度数
+    seconds_per_chord: float = 1.60
+    timbre: str = "warm"
 
     def describe(self) -> str:
         chords = " -> ".join(
@@ -87,6 +102,7 @@ class Progression:
         )
         lines = [
             f"{self.name}: root={note_name(self.root_midi)} mode={self.mode}",
+            f"pace: {self.seconds_per_chord:.2f}s/chord timbre={self.timbre}",
             f"progression: {chords}",
         ]
         if self.bass:
@@ -151,17 +167,20 @@ def _degrees(shape: tuple[int, ...], mode: str, bars: int) -> list[int]:
 
 
 def generate_progression(name: str, bars: int = 8) -> Progression:
-    """名前から調・モード・コード進行を決定的に生成する。
+    """名前から調・モード・進行・速さ・音色を決定的に生成する。
 
     bars は 4 の倍数で、進行の型を繰り返す。最後の4小節は終止形で、
     旋法ごとの終止の和音から主和音へ帰って終わる。
     """
+    normalized_name = normalize_name(name)
     if bars % 4 != 0 or bars <= 0:
         raise ValueError("bars must be a positive multiple of 4")
-    seed = _seed_int(name)
+    seed = _seed_int(normalized_name)
     mode = list(MODES)[seed % len(MODES)]
     root_midi = 48 + (seed >> 8) % 12  # C3..B3
     shape = PROGRESSION_SHAPES[(seed >> 16) % len(PROGRESSION_SHAPES)]
+    seconds_per_chord = SECONDS_PER_CHORD[(seed >> 24) % len(SECONDS_PER_CHORD)]
+    timbre = TIMBRES[(seed >> 32) % len(TIMBRES)]
 
     degrees = _degrees(shape, mode, bars)
     chords: list[tuple[int, int, int]] = []
@@ -176,10 +195,12 @@ def generate_progression(name: str, bars: int = 8) -> Progression:
         previous = triad
     bass = tuple(_bass_note(_degree_pc(root_midi, mode, d)) for d in degrees)
     return Progression(
-        name=name,
+        name=normalized_name,
         root_midi=root_midi,
         mode=mode,
         chords=tuple(chords),
         bass=bass,
         degrees=tuple(degrees),
+        seconds_per_chord=seconds_per_chord,
+        timbre=timbre,
     )
